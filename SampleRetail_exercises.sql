@@ -72,3 +72,73 @@ WITH T1 AS(
 SELECT *
 FROM T1
 WHERE price_rank <= 3
+
+--6.  Report cumulative total turnover by months in each year in pivot table format
+
+CREATE VIEW View1 AS
+SELECT DISTINCT MONTH(order_date) AS Month, YEAR(order_date) AS Year, 
+	   SUM(quantity*list_price) OVER(PARTITION BY YEAR(order_date) ORDER BY MONTH(order_date)) AS total_turnover
+FROM sale.orders AS A
+	INNER JOIN 
+	sale.order_item AS B 
+	ON A.order_id = B.order_id
+
+SELECT *
+FROM View1
+PIVOT
+(
+MAX(total_turnover)
+FOR Year
+IN ([2018], [2019], [2020])
+) AS PVT
+ORDER BY Month
+
+
+
+--7.  What percentage of customers purchasing a product have purchased the same product again?
+
+
+SELECT DISTINCT product_id, CAST( 1.0*(COUNT(customer_id)-COUNT(DISTINCT customer_id))/COUNT(customer_id) AS DECIMAL(3,2)) AS total_purchases
+FROM sale.orders AS A
+	INNER JOIN sale.order_item AS B
+	ON A.order_id = B.order_id
+GROUP BY product_id
+
+
+
+--8.  From the following table of user IDs, actions, and dates, write a query to return the publication and 
+--cancellation rate for each user.
+
+CREATE TABLE Action_Table
+(
+User_id BIGINT,
+Action VARCHAR(20),
+Date DATE,
+);
+
+INSERT Action_Table VALUES 
+(1, 'Start', '1-1-22'),
+(1, 'Cancel', '1-2-22'),
+(2, 'Start', '1-3-22'),
+(2, 'Publish', '1-4-22'),
+(3, 'Start', '1-5-22'),
+(3, 'Cancel', '1-6-22'),
+(1, 'Start', '1-7-22'),
+(1, 'Publish', '1-8-22')
+
+SELECT *
+FROM Action_Table
+
+
+
+WITH T1 AS(
+SELECT User_id, 
+	   SUM(CASE Action WHEN 'Publish' THEN 1 ELSE 0 END) AS Publication,
+	   SUM(CASE Action WHEN 'Cancel' THEN 1 ELSE 0 END) AS Cancellation,
+	   SUM(CASE Action WHEN 'Start' THEN 0 ELSE 1 END ) AS Total_action
+FROM Action_Table
+GROUP BY User_id
+)
+SELECT *, CAST(1.0*Publication/Total_action AS DECIMAL(3,2)) AS Publication_Rate,
+	      CAST(1.0*Cancellation/Total_action AS DECIMAL (3,2)) AS Cancellation_Rate
+FROM T1
